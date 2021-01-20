@@ -4,6 +4,7 @@ This can be used for creation of Python REPLs.
 """
 import __future__
 
+import threading
 from asyncio import get_event_loop
 from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, List, Optional, TypeVar
@@ -42,7 +43,7 @@ from prompt_toolkit.key_binding.bindings.open_in_editor import (
     load_open_in_editor_bindings,
 )
 from prompt_toolkit.key_binding.vi_state import InputMode
-from prompt_toolkit.lexers import DynamicLexer, Lexer, PygmentsLexer, SimpleLexer
+from prompt_toolkit.lexers import DynamicLexer, Lexer, SimpleLexer
 from prompt_toolkit.output import ColorDepth, Output
 from prompt_toolkit.styles import (
     AdjustBrightnessStyleTransformation,
@@ -54,7 +55,6 @@ from prompt_toolkit.styles import (
 )
 from prompt_toolkit.utils import is_windows
 from prompt_toolkit.validation import ConditionalValidator, Validator
-from pygments.lexers import Python3Lexer as PythonLexer
 
 from .completer import CompletePrivateAttributes, HidePrivateCompleter, PythonCompleter
 from .history_browser import PythonHistory
@@ -64,6 +64,7 @@ from .key_bindings import (
     load_sidebar_bindings,
 )
 from .layout import CompletionVisualisation, PtPythonLayout
+from .lexer import PtpythonLexer
 from .prompt_style import ClassicPrompt, IPythonPrompt, PromptStyle
 from .style import generate_style, get_all_code_styles, get_all_ui_styles
 from .utils import get_jedi_script_from_document
@@ -210,7 +211,7 @@ class PythonInput:
             lambda: self.complete_private_attributes,
         )
         self._validator = _validator or PythonValidator(self.get_compiler_flags)
-        self._lexer = _lexer or PygmentsLexer(PythonLexer)
+        self._lexer = PtpythonLexer(_lexer)
 
         self.history: History
         if history_filename:
@@ -996,3 +997,67 @@ class PythonInput:
                 app.vi_state.input_mode = InputMode.INSERT
 
         asyncio.ensure_future(do_in_terminal())
+
+    def read(self) -> str:
+        """
+        Read the input.
+
+        This will run the Python input user interface in another thread, wait
+        for input to be accepted and return that. By running the UI in another
+        thread, we avoid issues regarding possibly nested event loops.
+
+        This can raise EOFError, when Control-D is pressed.
+        """
+        # Capture the current input_mode in order to restore it after reset,
+        # for ViState.reset() sets it to InputMode.INSERT unconditionally and
+        # doesn't accept any arguments.
+        def pre_run(
+            last_input_mode: InputMode = self.app.vi_state.input_mode,
+        ) -> None:
+            if self.vi_keep_last_used_mode:
+                self.app.vi_state.input_mode = last_input_mode
+
+            if not self.vi_keep_last_used_mode and self.vi_start_in_navigation_mode:
+                self.app.vi_state.input_mode = InputMode.NAVIGATION
+
+        # Run the UI.
+        result: str = ""
+        exception: Optional[BaseException] = None
+
+        def in_thread() -> None:
+            nonlocal result, exception
+            try:
+                while True:
+                    try:
+                        result = self.app.run(pre_run=pre_run)
+
+                        if result.lstrip().startswith("\x1a"):
+                            # When the input starts with Ctrl-Z, quit the REPL.
+                            # (Important for Windows users.)
+                            raise EOFError
+
+                        # If the input is single line, remove leading whitespace.
+                        # (This doesn't have to be a syntax error.)
+                        if len(result.splitlines()) == 1:
+                            result = result.strip()
+
+                        if result and not result.isspace():
+                            return
+                    except KeyboardInterrupt:
+                        # Abort - try again.
+                        self.default_buffer.document = Document()
+                    except BaseException as e:
+                        exception = e
+                        return
+
+            finally:
+                if self.insert_blank_line_after_input:
+                    self.app.output.write("\n")
+
+        thread = threading.Thread(target=in_thread)
+        thread.start()
+        thread.join()
+
+        if exception is not None:
+            raise exception
+        return result
