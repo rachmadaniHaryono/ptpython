@@ -45,7 +45,7 @@ situations where we have to juggle three event loops:
 
 - The asyncio loop in which the code was embedded.
 - The asyncio loop from the prompt.
-- The 3rd party GUI loop. 
+- The 3rd party GUI loop.
 
 Approach taken in ptpython 3.0.11
 ---------------------------------

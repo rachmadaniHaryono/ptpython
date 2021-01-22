@@ -211,7 +211,7 @@ FAQ
 
 **Q**: The ``Meta``-key doesn't work.
 
-**A**: For some terminals you have to enable the Alt-key to act as meta key, but you 
+**A**: For some terminals you have to enable the Alt-key to act as meta key, but you
 can also type ``Escape`` before any key instead.
 
 

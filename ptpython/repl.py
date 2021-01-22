@@ -266,6 +266,7 @@ class PythonRepl(PythonInput):
                 # Inline import. Slightly speed up start-up time if black is
                 # not used.
                 import black
+
                 result_repr = black.format_str(
                     result_repr,
                     mode=black.FileMode(line_length=self.app.output.get_size().columns),
