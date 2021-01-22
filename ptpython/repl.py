@@ -110,6 +110,8 @@ class PythonRepl(PythonInput):
                 result = self.eval(text)
             except KeyboardInterrupt as e:  # KeyboardInterrupt doesn't inherit from Exception.
                 self._handle_keyboard_interrupt(e)
+            except SystemExit:
+                return
             except BaseException as e:
                 self._handle_exception(e)
             else:
@@ -153,6 +155,8 @@ class PythonRepl(PythonInput):
                 result = await self.eval_async(text)
             except KeyboardInterrupt as e:  # KeyboardInterrupt doesn't inherit from Exception.
                 self._handle_keyboard_interrupt(e)
+            except SystemExit:
+                return
             except BaseException as e:
                 self._handle_exception(e)
             else:
@@ -266,6 +270,7 @@ class PythonRepl(PythonInput):
                 # Inline import. Slightly speed up start-up time if black is
                 # not used.
                 import black
+
                 result_repr = black.format_str(
                     result_repr,
                     mode=black.FileMode(line_length=self.app.output.get_size().columns),
@@ -277,15 +282,17 @@ class PythonRepl(PythonInput):
 
         # If __pt_repr__ is present, take this. This can return prompt_toolkit
         # formatted text.
-        if hasattr(result, "__pt_repr__"):
-            try:
+        try:
+            if hasattr(result, "__pt_repr__"):
                 formatted_result_repr = to_formatted_text(
                     getattr(result, "__pt_repr__")()
                 )
                 if isinstance(formatted_result_repr, list):
                     formatted_result_repr = FormattedText(formatted_result_repr)
-            except:
-                pass
+        except:
+            # For bad code, `__getattr__` can raise something that's not an
+            # `AttributeError`. This happens already when calling `hasattr()`.
+            pass
 
         # Align every line to the prompt.
         line_sep = "\n" + " " * fragment_list_width(out_prompt)
@@ -556,6 +563,8 @@ def embed(
     :param configure: Callable that will be called with the `PythonRepl` as a first
                       argument, to trigger configuration.
     :param title: Title to be displayed in the terminal titlebar. (None or string.)
+    :param patch_stdout:  When true, patch `sys.stdout` so that background
+        threads that are printing will print nicely above the prompt.
     """
     # Default globals/locals
     if globals is None:
