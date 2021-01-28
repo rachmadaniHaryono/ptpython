@@ -270,7 +270,13 @@ class PythonRepl(PythonInput):
         out_prompt = to_formatted_text(self.get_output_prompt())
 
         # If the repr is valid Python code, use the Pygments lexer.
-        result_repr = repr(result)
+        try:
+            result_repr = repr(result)
+        except BaseException as e:
+            # Calling repr failed.
+            self._handle_exception(e)
+            return
+
         try:
             compile(result_repr, "", "eval")
         except SyntaxError:
@@ -336,17 +342,22 @@ class PythonRepl(PythonInput):
         if self.insert_blank_line_after_output:
             self.app.output.write("\n")
 
-    def print_formatted_text(self, formatted_text: StyleAndTextTuples) -> None:
+    def print_formatted_text(
+        self, formatted_text: StyleAndTextTuples, end: str = "\n"
+    ) -> None:
         print_formatted_text(
             FormattedText(formatted_text),
             style=self._current_style,
             style_transformation=self.style_transformation,
             include_default_pygments_style=False,
             output=self.app.output,
+            end=end,
         )
 
     def print_paginated_formatted_text(
-        self, formatted_text: StyleAndTextTuples
+        self,
+        formatted_text: StyleAndTextTuples,
+        end: str = "\n",
     ) -> None:
         """
         Print formatted text, using --MORE-- style pagination.
@@ -356,6 +367,7 @@ class PythonRepl(PythonInput):
         size = self.app.output.get_size()
 
         abort = False
+        print_all = False
 
         # Max number of lines allowed in the buffer before painting.
         max_rows = size.rows - 1
@@ -367,13 +379,13 @@ class PythonRepl(PythonInput):
 
         def flush_page() -> None:
             nonlocal page, columns_in_buffer, rows_in_buffer
-            self.print_formatted_text(page)
+            self.print_formatted_text(page, end="")
             page = []
             columns_in_buffer = 0
             rows_in_buffer = 0
 
         def show_pager() -> None:
-            nonlocal abort, max_rows
+            nonlocal abort, max_rows, print_all
 
             # Run pager prompt in another thread.
             # Same as for the input. This prevents issues with nested event
@@ -398,8 +410,15 @@ class PythonRepl(PythonInput):
             elif pager_result == PagerResult.NEXT_PAGE:
                 max_rows = size.rows - 1
 
+            elif pager_result == PagerResult.PRINT_ALL:
+                print_all = True
+
         # Loop over lines. Show --MORE-- prompt when page is filled.
-        for line in split_lines(formatted_text):
+
+        formatted_text = formatted_text + [("", end)]
+        lines = list(split_lines(formatted_text))
+
+        for lineno, line in enumerate(lines):
             for style, text, *_ in line:
                 for c in text:
                     width = get_cwidth(c)
@@ -408,7 +427,8 @@ class PythonRepl(PythonInput):
                     if columns_in_buffer + width > size.columns:
                         # Show pager first if we get too many lines after
                         # wrapping.
-                        if rows_in_buffer + 1 >= max_rows:
+                        if rows_in_buffer + 1 >= max_rows and not print_all:
+                            page.append(("", "\n"))
                             flush_page()
                             show_pager()
                             if abort:
@@ -420,15 +440,20 @@ class PythonRepl(PythonInput):
                     columns_in_buffer += width
                     page.append((style, c))
 
-            if rows_in_buffer + 1 >= max_rows:
+            if rows_in_buffer + 1 >= max_rows and not print_all:
+                page.append(("", "\n"))
                 flush_page()
                 show_pager()
                 if abort:
                     return
             else:
-                page.append(("", "\n"))
-                rows_in_buffer += 1
-                columns_in_buffer = 0
+                # Add line ending between lines (if `end="\n"` was given, one
+                # more empty line is added in `split_lines` automatically to
+                # take care of the final line ending).
+                if lineno != len(lines) - 1:
+                    page.append(("", "\n"))
+                    rows_in_buffer += 1
+                    columns_in_buffer = 0
 
         flush_page()
 
@@ -649,6 +674,7 @@ class PagerResult(Enum):
     ABORT = "ABORT"
     NEXT_LINE = "NEXT_LINE"
     NEXT_PAGE = "NEXT_PAGE"
+    PRINT_ALL = "PRINT_ALL"
 
 
 def create_pager_prompt(
@@ -667,6 +693,10 @@ def create_pager_prompt(
     @bindings.add("space")
     def next_page(event: KeyPressEvent) -> None:
         event.app.exit(result=PagerResult.NEXT_PAGE)
+
+    @bindings.add("a")
+    def print_all(event: KeyPressEvent) -> None:
+        event.app.exit(result=PagerResult.PRINT_ALL)
 
     @bindings.add("q")
     @bindings.add("c-c")
@@ -691,6 +721,7 @@ def create_pager_prompt(
                     "<more> -- MORE -- </more> "
                     "<key>[Enter]</key> Scroll "
                     "<key>[Space]</key> Next page "
+                    "<key>[a]</key> Print all "
                     "<key>[q]</key> Quit "
                     "</status-toolbar>: "
                 ),
