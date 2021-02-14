@@ -102,30 +102,39 @@ class PythonRepl(PythonInput):
 
         try:
             while True:
-                # Read.
                 try:
-                    text = self.read()
-                except EOFError:
-                    return
+                    # Read.
+                    try:
+                        text = self.read()
+                    except EOFError:
+                        return
 
-                # Eval.
-                try:
-                    result = self.eval(text)
-                except KeyboardInterrupt as e:  # KeyboardInterrupt doesn't inherit from Exception.
+                    # Eval.
+                    try:
+                        result = self.eval(text)
+                    except KeyboardInterrupt as e:  # KeyboardInterrupt doesn't inherit from Exception.
+                        raise
+                    except SystemExit:
+                        return
+                    except BaseException as e:
+                        self._handle_exception(e)
+                    else:
+                        # Print.
+                        if result is not None:
+                            self.show_result(result)
+
+                        # Loop.
+                        self.current_statement_index += 1
+                        self.signatures = []
+
+                except KeyboardInterrupt as e:
+                    # Handle all possible `KeyboardInterrupt` errors. This can
+                    # happen during the `eval`, but also during the
+                    # `show_result` if something takes too long.
+                    # (Try/catch is around the whole block, because we want to
+                    # prevent that a Control-C keypress terminates the REPL in
+                    # any case.)
                     self._handle_keyboard_interrupt(e)
-                except SystemExit:
-                    return
-                except BaseException as e:
-                    self._handle_exception(e)
-                else:
-                    # Print.
-                    if result is not None:
-                        self.show_result(result)
-
-                    # Loop.
-                    self.current_statement_index += 1
-                    self.signatures = []
-
         finally:
             if self.terminal_title:
                 clear_title()
@@ -152,31 +161,38 @@ class PythonRepl(PythonInput):
 
         try:
             while True:
-                # Read.
                 try:
-                    text = await loop.run_in_executor(None, self.read)
-                except EOFError:
-                    return
+                    # Read.
+                    try:
+                        text = await loop.run_in_executor(None, self.read)
+                    except EOFError:
+                        return
 
-                # Eval.
-                try:
-                    result = await self.eval_async(text)
-                except KeyboardInterrupt as e:  # KeyboardInterrupt doesn't inherit from Exception.
+                    # Eval.
+                    try:
+                        result = await self.eval_async(text)
+                    except KeyboardInterrupt as e:  # KeyboardInterrupt doesn't inherit from Exception.
+                        raise
+                    except SystemExit:
+                        return
+                    except BaseException as e:
+                        self._handle_exception(e)
+                    else:
+                        # Print.
+                        if result is not None:
+                            await loop.run_in_executor(
+                                None, lambda: self.show_result(result)
+                            )
+
+                        # Loop.
+                        self.current_statement_index += 1
+                        self.signatures = []
+
+                except KeyboardInterrupt as e:
+                    # XXX: This does not yet work properly. In some situations,
+                    # `KeyboardInterrupt` exceptions can end up in the event
+                    # loop selector.
                     self._handle_keyboard_interrupt(e)
-                except SystemExit:
-                    return
-                except BaseException as e:
-                    self._handle_exception(e)
-                else:
-                    # Print.
-                    if result is not None:
-                        await loop.run_in_executor(
-                            None, lambda: self.show_result(result)
-                        )
-
-                    # Loop.
-                    self.current_statement_index += 1
-                    self.signatures = []
         finally:
             if self.terminal_title:
                 clear_title()
@@ -199,9 +215,7 @@ class PythonRepl(PythonInput):
             try:
                 code = self._compile_with_flags(line, "eval")
             except SyntaxError:
-                # If not a valid `eval` expression, run using `exec` instead.
-                code = self._compile_with_flags(line, "exec")
-                exec(code, self.get_globals(), self.get_locals())
+                pass
             else:
                 # No syntax errors for eval. Do eval.
                 result = eval(code, self.get_globals(), self.get_locals())
@@ -211,6 +225,13 @@ class PythonRepl(PythonInput):
 
                 self._store_eval_result(result)
                 return result
+
+            # If not a valid `eval` expression, run using `exec` instead.
+            # Note that we shouldn't run this in the `except SyntaxError` block
+            # above, then `sys.exc_info()` would not report the right error.
+            # See issue: https://github.com/prompt-toolkit/ptpython/issues/435
+            code = self._compile_with_flags(line, "exec")
+            exec(code, self.get_globals(), self.get_locals())
 
         return None
 
@@ -231,9 +252,7 @@ class PythonRepl(PythonInput):
             try:
                 code = self._compile_with_flags(line, "eval")
             except SyntaxError:
-                # If not a valid `eval` expression, run using `exec` instead.
-                code = self._compile_with_flags(line, "exec")
-                exec(code, self.get_globals(), self.get_locals())
+                pass
             else:
                 # No syntax errors for eval. Do eval.
                 result = eval(code, self.get_globals(), self.get_locals())
@@ -243,6 +262,10 @@ class PythonRepl(PythonInput):
 
                 self._store_eval_result(result)
                 return result
+
+            # If not a valid `eval` expression, run using `exec` instead.
+            code = self._compile_with_flags(line, "exec")
+            exec(code, self.get_globals(), self.get_locals())
 
         return None
 
@@ -266,12 +289,18 @@ class PythonRepl(PythonInput):
     def show_result(self, result: object) -> None:
         """
         Show __repr__ for an `eval` result.
+
+        Note: this can raise `KeyboardInterrupt` if either calling `__repr__`,
+              `__pt_repr__` or formatting the output with "Black" takes to long
+              and the user presses Control-C.
         """
         out_prompt = to_formatted_text(self.get_output_prompt())
 
         # If the repr is valid Python code, use the Pygments lexer.
         try:
             result_repr = repr(result)
+        except KeyboardInterrupt:
+            raise  # Don't catch here.
         except BaseException as e:
             # Calling repr failed.
             self._handle_exception(e)
@@ -306,6 +335,8 @@ class PythonRepl(PythonInput):
                 )
                 if isinstance(formatted_result_repr, list):
                     formatted_result_repr = FormattedText(formatted_result_repr)
+        except KeyboardInterrupt:
+            raise  # Don't catch here.
         except:
             # For bad code, `__getattr__` can raise something that's not an
             # `AttributeError`. This happens already when calling `hasattr()`.

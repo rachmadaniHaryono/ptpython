@@ -11,7 +11,7 @@ with open(os.path.join(os.path.dirname(__file__), "README.rst")) as f:
 setup(
     name="ptpython",
     author="Jonathan Slenders",
-    version="3.0.13",
+    version="3.0.16",
     url="https://github.com/prompt-toolkit/ptpython",
     description="Python REPL build on top of prompt_toolkit",
     long_description=long_description,
@@ -20,10 +20,8 @@ setup(
         "appdirs",
         "importlib_metadata;python_version<'3.8'",
         "jedi>=0.16.0",
-        # Use prompt_toolkit 3.0.11, because ptpython now runs the UI in the
-        # background thread, and we need the terminal size polling that was
-        # introduced here.
-        "prompt_toolkit>=3.0.11,<3.1.0",
+        # Use prompt_toolkit 3.0.16, because of the `DeduplicateCompleter`.
+        "prompt_toolkit>=3.0.16,<3.1.0",
         "pygments",
         "black",
     ],

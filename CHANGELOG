@@ -1,6 +1,47 @@
 CHANGELOG
 =========
 
+3.0.16: 2020-02-11
+------------------
+
+(Commit 7f619e was missing in previous release.)
+
+Fixes:
+- Several fixes to the completion code:
+  * Give dictionary completions priority over path completions.
+  * Always call non-fuzzy completer after fuzzy completer to prevent that some
+    completions were missed out if the fuzzy completer doesn't find them.
+
+
+3.0.15: 2020-02-11
+------------------
+
+New features:
+- When pressing control-w, only delete characters until a punctuation.
+
+Fixes:
+- Fix `AttributeError` during retrieval of signatures with type annotations.
+
+
+3.0.14: 2020-02-10
+------------------
+
+New features:
+- Display of signature and completion drop down together.
+- If `DictionaryCompleter` is enabled, also retrieve signatures when Jedi
+  fails, using the same logic.
+- List function parameters first and private attributes at the end in the
+  completion menu.
+- Cleanup of the completion code.
+
+Fixes:
+- Handle exceptions raised when `repr()` is called.
+- Fix leakage of `exc_info` from eval to exec call.
+- Fix handling of `KeyboardInterrupt` in REPL during evaluation of `__repr__`.
+- Fix style for signature toolbar.
+- Hide signature when sidebar is visible.
+
+
 3.0.13: 2020-01-26
 ------------------
 
