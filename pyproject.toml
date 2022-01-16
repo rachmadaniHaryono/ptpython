@@ -10,14 +10,16 @@
 # % sys.version_info[:2],
 #
 # isort configuration that is compatible with Black.
-# 
+#
 # For ipython, a possible solution would be to set the `python` property to ">=3.8"
-# 
-# ipython 8.0.0 also require: 
+#
+# ipython 8.0.0 also require:
 # black
 # jedi
 # prompt_toolkit
 # pygments
+#
+# commitizen requires Python >=3.6.2,<4.0.0, so it will not be satisfied for Python >=4.0.0
 
 [tool]
 
@@ -43,7 +45,7 @@ authors = ["Jonathan Slenders"]
 readme = "README.rst"
 
 [tool.poetry.dependencies]
-python = ">=3.8"
+python = ">=3.8,<4.0.0"
 appdirs = "^1.4.4"
 black = {version = "^21.12b0", extras = ["all"]}
 importlib-metadata = {python = "<3.8", version = "*"}
@@ -51,6 +53,11 @@ ipython = {version = "^8.0.0", extras = ["ptipython"]}
 jedi = "^0.18.1"
 prompt-toolkit = "^3.0.24"
 Pygments = "^2.11.2"
+
+[tool.poetry.dev-dependencies]
+pre-commit = "^2.16.0"
+commitizen = "^2.20.3"
+language-formatters-pre-commit-hooks = "^2.2.0"
 
 [tool.poetry.scripts]
 ptpython = 'ptpython.entry_points.run_ptpython:run'
