@@ -1,9 +1,22 @@
+# entry_points from setup.py:
+# "ptpython = ptpython.entry_points.run_ptpython:run",
+# "ptipython = ptpython.entry_points.run_ptipython:run",
+# "ptpython%s = ptpython.entry_points.run_ptpython:run" % sys.version_info[0],
+# "ptpython%s.%s = ptpython.entry_points.run_ptpython:run"
+# % sys.version_info[:2],
+# "ptipython%s = ptpython.entry_points.run_ptipython:run"
+# % sys.version_info[0],
+# "ptipython%s.%s = ptpython.entry_points.run_ptipython:run"
+# % sys.version_info[:2],
+#
+# isort configuration that is compatible with Black.
+
+[tool]
+
 [tool.black]
 target-version = ['py36']
 
-
 [tool.isort]
-# isort configuration that is compatible with Black.
 multi_line_output = 3
 include_trailing_comma = true
 known_first_party = "ptpython"
@@ -11,3 +24,28 @@ known_third_party = "prompt_toolkit,pygments,asyncssh"
 force_grid_wrap = 0
 use_parentheses = true
 line_length = 88
+
+[tool.poetry]
+name = "ptpython"
+version = "3.0.20"
+description = "Python REPL build on top of prompt_toolkit"
+classifiers = ["Programming Language :: Python :: 3", "Programming Language :: Python :: 3.6", "Programming Language :: Python :: 3.7", "Programming Language :: Python :: 3.8", "Programming Language :: Python :: 3 :: Only", "Programming Language :: Python"]
+homepage = "https://github.com/prompt-toolkit/ptpython"
+authors = ["Jonathan Slenders"]
+readme = "README.rst"
+
+[tool.poetry.dependencies]
+python = ">=3.8"
+appdirs = "*"
+importlib-metadata = {python = "<3.8", version = "*"}
+jedi = ">=0.16.0"
+prompt-toolkit = "<3.1.0,>=3.0.18"
+pygments = "*"
+black = {version = "^21.12b0", extras = ["all"]}
+ipython = {version = "^8.0.0", extras = ["ptipython"]}
+
+[tool.poetry.scripts]
+ptpython = 'ptpython.entry_points.run_ptpython:run'
+ptipython = 'ptpython.entry_points.run_ptipython:run'
+ptpython3 = 'ptpython.entry_points.run_ptpython:run'
+ptipython3 = 'ptpython.entry_points.run_ptipython:run'
