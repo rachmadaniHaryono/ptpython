@@ -69,5 +69,4 @@ ptipython3 = 'ptpython.entry_points.run_ptipython:run'
 version = "3.0.21rc0"
 version_files = [
     "pyproject.toml:version",
-    "setup.py",
 ]
