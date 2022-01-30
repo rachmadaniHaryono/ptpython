@@ -47,7 +47,7 @@ readme = "README.rst"
 [tool.poetry.dependencies]
 python = ">=3.8,<4.0.0"
 appdirs = "^1.4.4"
-black = {version = "^21.12b0", extras = ["all"]}
+black = {version = "22.1.0", extras = ["all"]}
 importlib-metadata = {python = "<3.8", version = "*"}
 ipython = {version = "^8.0.0", extras = ["ptipython"]}
 jedi = "^0.18.1"
