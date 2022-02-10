@@ -34,13 +34,10 @@ from prompt_toolkit.shortcuts import print_formatted_text
 
 from ptpython.repl import embed, enable_deprecation_warnings, run_config
 
-try:
-    if sys.version_info >= (3, 8):
-        import importlib.metadata as metadata
-    else:
-        import importlib_metadata as metadata
-except ImportError:
-    import importlib_metadata as metadata  # type: ignore
+if sys.version >= (3, 8):
+    from importlib import metadata
+else:
+    import importlib_metadata as metadata
 
 
 __all__ = ["create_parser", "get_config_and_history_file", "run"]
