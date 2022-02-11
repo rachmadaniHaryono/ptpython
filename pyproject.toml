@@ -37,7 +37,7 @@ line_length = 88
 
 [tool.poetry]
 name = "ptpython"
-version = "3.0.21rc1"
+version = "3.0.21rc2"
 description = "Python REPL build on top of prompt_toolkit"
 classifiers = ["Programming Language :: Python :: 3", "Programming Language :: Python :: 3.6", "Programming Language :: Python :: 3.7", "Programming Language :: Python :: 3.8", "Programming Language :: Python :: 3 :: Only", "Programming Language :: Python"]
 homepage = "https://github.com/prompt-toolkit/ptpython"
@@ -66,7 +66,7 @@ ptpython3 = 'ptpython.entry_points.run_ptpython:run'
 ptipython3 = 'ptpython.entry_points.run_ptipython:run'
 
 [tool.commitizen]
-version = "3.0.21rc1"
+version = "3.0.21rc2"
 version_files = [
     "pyproject.toml:version",
 ]
